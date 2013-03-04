@@ -1,5 +1,34 @@
 require 'socket'
 
+=begin
+	Especificação de protocolo
+	
+	\CONNECTED - RESPOSTA QUE O CLIENTE RECEBE DO SERVIDOR 
+		APÓS ESTABELECER UMA CONEXÃO C\ SUCESSO
+
+	\LU - REQUISICAO QUE O CLIENTE FAZ P\ RECEBER A LISTA DE CLIENTES NAO OCUPADOS
+	
+	\LUA - REQUISICAO QUE O CLIENTE FAZ P\ RECEBER A LISTA TODOS OS CLIENTES E SEUS STATUS
+
+	\PLAY <***PARAMETROS***> - REQUISICAO Q O CLIENTE FAZ P/ EXECUTAR UMA JOGADA
+
+	\PING - REQUISICAO TANTO SERVIDOR OU CLIENTE P/ SERVIR DE ACK E TESTAR A CONEXAO
+
+	\PONG - RESPOSTA DA REQUISICAO PING P/ TESTE DE CONEXAO
+
+	\INVITE <***USUARIO(S)***> - CLIENTE FAZ REQUISICAO AO SERVIDOR P/ INFORMAR CONVITE A
+		OUTRO(S) USUARIO(S)
+
+	\CONNECTED CANAL - RESPOSTA DO SERVIDOR AO CLIENTE 
+		EM CASO DE SUCESSO NA REQUISICAO DE CONVITE, INFORMAR CANAL C/ USUARIOS 
+		QUE ACEITARÃO O CONVITE
+	
+	\NOT_CONNECTED CANAL - RESPOSTA DO SERVIDOR AO CLIENTE INFORMANDO O NAO SUCESSO NA 
+		ABERTURA DO CANAL
+	
+	
+=end
+
 
 class Usuario
 	attr_reader :ip, :pid, :nome, :socket, :time_without_connection
@@ -13,6 +42,42 @@ class Usuario
 
   	def close_connection
   		@socket.close
+  	end
+
+	def to_s
+		"<*** #{@ip} - #{@pid} - #{@socket} - #{@time_without_connection} ***>"
+	end
+
+end
+
+class Canal
+	attr_reader :usuarios, :last_activity
+
+	def initialize args
+		@criacao = @last_activity = Time.now
+		@finalizacao = nil
+		@usuarios = []
+
+	    
+		#preenche todos os usuarios
+	    args.each do |k, v|
+	    	@usuarios << v if k.to_s =~ /^?(usuario)/ and not v.nil?
+	    end    	
+
+	    # .find_all {|k,v| k.to_s =~ /^?(usuario)/ and not v.nil?}
+	    
+
+
+  	end
+
+  	def fechar_canal
+  		# Notifica os usuarios 
+  		usuarios.each do |u|
+
+  		end
+  		# Marca o canal como fechado
+  		@finalizacao = Time.now
+
   	end
 
 	def to_s
