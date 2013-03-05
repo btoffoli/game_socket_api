@@ -26,14 +26,33 @@ require 'socket'
 	\NOT_CONNECTED CANAL - RESPOSTA DO SERVIDOR AO CLIENTE INFORMANDO O NAO SUCESSO NA 
 		ABERTURA DO CANAL
 	
+
+	Falta pensar numa forma de ter um listener(s) do eventos gerenciados 
+	pelo servidor. Ex. Encerramento de partida, Fechamento de canal, 
+	Desconexão de um dado usuário.
+	Isso p/ evitar muita dependencia(referencia cruzada) entre as classes
+
+
 	
 =end
 
-
-class Usuario
-	attr_reader :ip, :pid, :nome, :socket, :time_without_connection
+class ObjetoBase
+	attr_reader :criacao, :finalizacao
 
 	def initialize args
+		@criacao = Time.now
+	end
+
+end
+
+
+class Usuario < ObjetoBase
+	attr_reader :ip, :pid, :nome, :socket, :time_without_connection,
+	:partida, 
+
+
+	def initialize args
+		super
 		@time_without_connection = Time.now
 	    args.each do |k,v|
 	      instance_variable_set("@#{k}", v) unless v.nil?
@@ -41,6 +60,9 @@ class Usuario
   	end
 
   	def close_connection
+  		# @partida.sair(self) if @partida
+  		# Avisa o canal da saida do usuario
+  		@canal.sair(self) if canal
   		@socket.close
   	end
 
@@ -50,7 +72,33 @@ class Usuario
 
 end
 
-class Canal
+class Partida < ObjetoBase
+	attr_reader :usuario_corrente, :primeiro_usuario, :usuarios
+
+	def initilize args
+		super
+		@usuario_corrente = @primeiro_usuario = args[:primeiro_usuario]
+		@usuarios = args[:usuarios]
+	end
+
+	def proximo_usuario
+		_pos = usuarios.index usuario_corrente		
+		if _pos == usuarios.size - 1 
+			@usuario_corrente = @primeiro_usuario
+		else
+			@usuario_corrente = usuarios[_pos]
+	end
+
+	def encerrar_partida
+		@finalizacao = Time.now
+	end
+
+	def sair usuario
+		usuario.
+
+end
+
+class Canal < ObjetoBase
 	attr_reader :usuarios, :last_activity
 
 	def initialize args
@@ -73,7 +121,7 @@ class Canal
   	def fechar_canal
   		# Notifica os usuarios 
   		usuarios.each do |u|
-
+  			u.send("\canal")
   		end
   		# Marca o canal como fechado
   		@finalizacao = Time.now
