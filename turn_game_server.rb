@@ -77,14 +77,14 @@ class ObjetoBase
   attr_accessor :finalizacao
 
 
-  def initialize args
+  def initialize *args
     require 'securerandom'
     @id = SecureRandom.uuid
     @criacao = Time.now
   end
 
   def to_s
-    "<id:#{@id} - criacao:#{@criacao}>"
+    "<class:#{self.class} id:#{@id} - criacao:#{@criacao}>"
   end
 
 end
@@ -152,18 +152,20 @@ class UsuarioEventsListener < ObjetoBase
 end
 
 
-class Convite < UsuarioEventsListener
+class Convite < ObjetoBase
+
+  attr_accessor :usuario_que_convidou, :usuario_convidado, :status
 
   # Estados do convite CRIADO ENVIO, AGUARDANDO, ACEITE e NEGADO e QUEDA_CONEXAO
   # sendo que ENVIO e AGUARDANDO o
 
   def initialize usuario_que_convidou, usuario_convidado
-    require 'set'
+    #require 'set'
     super
 
 
     @usuario_que_convidou = usuario_que_convidou
-    @usuario_convidado = usuario_que_convidou
+    @usuario_convidado = usuario_convidado
     @status = :CRIADO
 
   end
@@ -219,7 +221,7 @@ class Usuario < ObjetoBase
 
 
   def to_s
-    "<#{super.to_s} - nome:#{@nome} - ip:#{@ip} - socket:#{@socket} - ultima_conexao:#{@ultima_conexao}>"
+    "<id:#{@id} - nome:#{@nome} - ip:#{@ip} - socket:#{@socket} - ultima_conexao:#{@ultima_conexao}>"
   end
 
 end
@@ -252,13 +254,13 @@ class Partida < UsuarioEventsListener
 end
 
 
-class Canal < UsuarioEventsListener
+class Canal < ObjetoBase
   attr_reader :usuarios, :last_activity
 
-  def initialize args
+  def initialize usuarios
+    super
     @last_activity = Time.now
-    @finalizacao = nil
-    @usuarios = args[:usuarios]
+    @usuarios = usuarios
 
 
     #preenche todos os usuarios
@@ -286,7 +288,7 @@ end
 
 class GameManager
 
-  attr_accessor :usuarios, :convites, :canais, :partidas
+  attr_reader :usuarios, :convites, :canais, :partidas
 
 
   def initialize
@@ -305,50 +307,54 @@ class GameManager
     @usuarios << usuario unless @usuarios.index usuario
 
     #informar nome
-    if mensagem.index 'INFORMAR_NOME:'
+    if mensagem.index 'INFORMAR_NOME|'
 
-      _nome = mensagem.split(':')[1]
+      _nome = mensagem.split('|')[1]
       puts "nome=#{_nome}"
       usuario.nome = _nome
-      enviar_mensagem(usuario, 'INFORMAR_NOME_NOVAMENTE') unless usuario.nome
+      enviar_mensagem(usuario, 'INFORMAR_NOME_NOVAMENTE|') unless usuario.nome
 
       #listar usuarios
-    elsif mensagem.index 'LU:'
+    elsif mensagem.index 'LU|'
 
-      enviar_mensagem(usuario, "usuarios:#{@usuarios.to_s}")
+      enviar_mensagem(usuario, "usuarios|#{@usuarios.to_s}")
 
       #convidar alguem
-    elsif mensagem.index 'INVITE:'
+    elsif mensagem.index 'INVITE|'
 
-      _str_convidado = mensagem.split(':')[1]
+      _str_convidado = (mensagem.split('|')[1]).strip
       #usa como chave p/ buscar o usuário o socket.to_s
-      _convidado = @usuarios.find_all { |u| u.to_s == _str_convidado }
+      _convidado = @usuarios.find { |u| u.to_s == _str_convidado }
 
       if _convidado
-        _convite = Convite.new(usuario_que_convidou: usuario, usuario_convidado: _convidado)
+        _convite = Convite.new(usuario, _convidado)
         @convites << _convite
-        enviar_mensagem(_convidado, "INVITED:#{_convite}")
+        enviar_mensagem(_convidado, "INVITED|#{_convite}")
       else
-        enviar_mensagem(usuario, "INVITED_CANCELED:USUARIO_INVALIDO")
+        enviar_mensagem(usuario, "INVITED_CANCELED|USUARIO_INVALIDO")
       end
 
-    elsif mensagem.index 'INVITED_DENNIED:'
-      _str_convite_negado = mensagem.split(':')[1]
+    elsif mensagem.index 'INVITED_DENNIED|'
+      _str_convite_negado = mensagem.split('|')[1].strip
       _convite = @convites.find { |conv| conv.to_s == _str_convite_negado }
       if (_convite)
         _usuario_que_convidou = _convite.usuario_que_convidou
-        enviar_mensagem(_usuario_que_convidou, "INVITED_DENNIED:#{_convite}")
+        enviar_mensagem(_usuario_que_convidou, "INVITED_DENNIED|#{_convite}")
       end #igonorar caso o convite nem exista no servidor
 
-    elsif mensagem.index 'INVITED_ACCEPT:'
-      _str_convite_negado = mensagem.split(':')[1]
-      _convite = @convites.find { |conv| conv.to_s == _str_convite_negado }
+    elsif mensagem.index 'INVITED_ACCEPT|'
+      _str_convite_aceito = mensagem.split('|')[1].strip
+      _convite = @convites.find { |conv| conv.to_s == _str_convite_aceito }
       if (_convite)
         _usuario_que_convidou = _convite.usuario_que_convidou
         _usuario_convidado = _convite.usuario_convidado
-        _canal = Canal.new(:usuarios[_usuario_que_convidou, _usuario_convidado])
-        enviar_mensagem(_usuario_que_convidou, "INVITED_ACCEPT:#{_canal}")
-        enviar_mensagem(_usuario_convidado, "INVITED_ACCEPT:#{_canal}")
+        _canal = Canal.new [_usuario_que_convidou, _usuario_convidado]
+        @canais << _canal
+        enviar_mensagem(_usuario_que_convidou, "INVITED_ACCEPT|#{_canal}")
+        enviar_mensagem(_usuario_convidado, "INVITED_ACCEPT|#{_canal}")
+        _convite.finalizacao = Time.now
+        #por enquanto estou removendo o convite
+        @convites.delete(_convite)
 
       end
     else
@@ -361,7 +367,7 @@ class GameManager
 
   def enviar_mensagem usuario, mensagem
     begin
-      usuario.socket.puts(mensagem)
+      usuario.socket.puts(mensagem.strip)
     rescue Exception => exp
 
       puts "Erro ao enviar mensagem #{mensagem} ao usuario #{usuario}, exp = #{exp}"
@@ -370,29 +376,29 @@ class GameManager
 
 
   def remover_usuario usuario
-    @usuarios -= [usuario]
+    @usuarios.delete(usuario)
 
     #remove convites dos usuários
     _convites_a_serem_removidos = []
     @convites.each do |conv|
       #manda mensagem de cancelamento de convite ao outro usuario
-      enviar_mensagem(conv.usuario_convidado, "INVITED_CANCELED:#{conv}") if conv.usuario_que_convidou == usuario
-      enviar_mensagem(conv.usuario_que_convidou, "INVITED_CANCELED:#{conv}") if conv.usuario_convidado == usuario
+      enviar_mensagem(conv.usuario_convidado, "INVITED_CANCELED|#{conv}") if conv.usuario_que_convidou == usuario
+      enviar_mensagem(conv.usuario_que_convidou, "INVITED_CANCELED|#{conv}") if conv.usuario_convidado == usuario
       _convites_a_serem_removidos << conv
     end
-    @convites - _convites_a_serem_removidos
-
+    _convites_a_serem_removidos.each { |conv| @convites.delete conv }
 
     #remove canais dos usuários
     _canais_a_serem_removidos = []
-    @canais.each do |canal|
-      #manda mensagem de cancelamento de convite ao outro usuario
-      enviar_mensagem(canal.usuario_convidado, "INVITED_CANCELED:#{canal}") if canal.usuario_que_convidou == usuario
-      enviar_mensagem(canal.usuario_que_convidou, "INVITED_CANCELED:#{canal}") if canal.usuario_convidado == usuario
-      _convites_a_serem_removidos << canal
+    @canais.each { |canal| _canais_a_serem_removidos << canal  }
+    _canais_a_serem_removidos.each do |canal|
+      @canais.delete canal
+      canal.usuarios.each do |usu|
+        enviar_mensagem(usu, "CHANEL_CANCELED|#{canal}")
+      end
     end
-    @canais - _canais_a_serem_removidos
 
+    puts "@convites=#{@convites}\n@canais=#{@canais}"
 
   end
 
@@ -462,7 +468,7 @@ class TurnGameServer
               puts "Ocorreu um erro com o cliente"
             ensure
               puts 'Fechando conexao'
-              fechar_conexao _u if u
+              fechar_conexao _u if _u
               # s.close
               # @usuarios -= [_u]
             end
@@ -530,7 +536,7 @@ class TurnGameServer
 
   def fechar_conexao usuario
     puts "fechando conexao do usuario #{usuario}"
-    @usuarios -= [usuario]
+    @usuarios.delete(usuario)
     puts "fechada a conexao do usuario #{usuario}"
     @game_manager.remover_usuario usuario
   end

@@ -2,6 +2,40 @@ require 'socket'
 
 include Socket::Constants
 
+#Bombando string
+class String
+  def trim!(chars)
+    rtrim!(chars)
+    ltrim!(chars)
+  end
+
+  def rtrim!(chars)
+    gsub!(/(#{trim_prepare(chars)})+$/, '')
+  end
+
+  def ltrim!(chars)
+    gsub!(/^(#{trim_prepare(chars)})+/, '')
+  end
+
+  def trim(chars)
+    dup.rtrim(chars).ltrim(chars)
+  end
+
+  def rtrim(chars)
+    dup.rtrim!(chars)
+  end
+
+  def ltrim(chars)
+    dup.ltrim!(chars)
+  end
+
+  private
+  def trim_prepare(chars)
+    chars = chars.split("").collect { |char| Regexp.escape(char) }
+    chars.join('|')
+  end
+end
+
 s = TCPSocket.open 'localhost', 2000
 
 timeval = [5, 0].pack("l_2")
@@ -25,7 +59,8 @@ t_envio = Thread.start(daemon: true) do
   		# puts "recebendo: #{line} \n"         # and print them
   		print "Entre com um comando: #{gets}" 
   		comando = gets
-  		s.puts comando
+  		s.puts comando.strip
+
   		s.flush
 	end
 end
