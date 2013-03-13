@@ -220,19 +220,21 @@ class Usuario < ObjetoBase
   end
 
 
-  def to_s
-    "<id:#{@id} - nome:#{@nome} - ip:#{@ip} - socket:#{@socket} - ultima_conexao:#{@ultima_conexao}>"
-  end
+  #def to_s
+  #  "<id:#{@id} - nome:#{@nome} - ip:#{@ip} - socket:#{@socket} - ultima_conexao:#{@ultima_conexao}>"
+  #end
 
 end
 
-class Partida < UsuarioEventsListener
-  attr_accessor :usuario_corrente, :primeiro_usuario, :usuarios
+class Partida
+  attr_accessor :usuario_corrente, :primeiro_usuario, :usuarios, :positions
 
-  def initilize args
+  def initilize *args
     super
     @usuario_corrente = @primeiro_usuario = args[:primeiro_usuario]
     @usuarios = args[:usuarios]
+    @positions = []
+    3.times { @positions << [] }
   end
 
   def proximo_usuario
@@ -243,6 +245,53 @@ class Partida < UsuarioEventsListener
       @usuario_corrente = usuarios[_pos]
     end
   end
+
+  def play usuario, posicao
+
+    #posicao => {x: i, y: j}
+
+    return :USUARIO_INVALIDO if usuario != @usuario_corrente
+
+    return :POSICAO_OCUPADA if @positions[posicao[:x]][posicao[:y]]
+
+    #grava a posicao jogada pelo usuario
+    @positions[posicao[:x]][posicao[:y]] = usuario
+
+    #checando linhas
+    return :GANHADOR if ver_se_o_mesmo(@positions[0][0], @positions[0][1], @positions[0][2])
+    return :GANHADOR if ver_se_o_mesmo(@positions[1][0], @positions[1][1], @positions[1][2])
+    return :GANHADOR if ver_se_o_mesmo(@positions[2][0], @positions[2][1], @positions[2][2])
+
+    #checando colunas
+    return :GANHADOR if ver_se_o_mesmo(@positions[0][0], @positions[1][0], @positions[2][0])
+    return :GANHADOR if ver_se_o_mesmo(@positions[0][1], @positions[1][1], @positions[2][1])
+    return :GANHADOR if ver_se_o_mesmo(@positions[0][2], @positions[1][2], @positions[2][2])
+
+    #verificando posicoes diagonais
+    return :GANHADOR if ver_se_o_mesmo(@positions[0][0], @positions[1][1], @positions[2][2])
+    return :GANHADOR if ver_se_o_mesmo(@positions[0][2], @positions[1][1], @positions[2][0])
+
+
+    #troca o corrente
+    proximo_usuario
+
+    return :PROXIMO
+
+  end
+
+  def ver_se_o_mesmo objeto1, objeto2, objeto3
+
+    _resp = objeto1 == objeto2
+
+    if _resp && objeto1 == objeto3
+      return true
+    else
+      return false
+    end
+
+  end
+
+
 
   def encerrar_partida
     @finalizacao = Time.now
@@ -255,12 +304,13 @@ end
 
 
 class Canal < ObjetoBase
-  attr_reader :usuarios, :last_activity
+  attr_reader :usuarios, :last_activity, :partidas
 
   def initialize usuarios
     super
     @last_activity = Time.now
     @usuarios = usuarios
+    @partidas = []
 
 
     #preenche todos os usuarios
@@ -273,10 +323,35 @@ class Canal < ObjetoBase
 
   end
 
+  def iniciar_partida
+
+    if @partidas
+      _usuario_da_vez = @partida.last.usuario_corrente
+      @partida = Partida.new usuarios: @usuarios, primeiro_usuario: _usuario_da_vez
+    else
+      @partida = Partida.new usuarios: @usuarios, primeiro_usuario: @usuarios.first
+    end
+
+    @partidas << @partida
+
+    @partida
+
+  end
+
+
+  def play usuario, parametros
+    _posicao = {x: parametros[:x], y: parametros[:y]}
+
+    return @partida.play usuario, _posicao
+
+  end
+
+
+
   def fechar_canal
     # Notifica os usuarios
     usuarios.each do |u|
-      u.send("\canal")
+      u.send("CLOSED_CHANNEL|#{self}")
     end
     # Marca o canal como fechado
     @finalizacao = Time.now
@@ -288,26 +363,34 @@ end
 
 class GameManager
 
-  attr_reader :usuarios, :convites, :canais, :partidas
+  attr_reader :usuarios, :convites, :canais, :partidas, :chars_separador_comando, :chars_separador_parametros
 
 
-  def initialize
+  def initialize char_separador_comando, char_separador_parametros
+
+    @chars_separador_comando = char_separador_comando
+    @chars_separador_parametros = char_separador_parametros
     @usuarios = []
     @convites = []
     @canais = []
     @partidas = []
+
   end
 
   def processar_mensagem usuario, mensagem
 
     mensagem = mensagem.gsub('\n', '')
 
+    _comando, _parametros = mensagem.split(chars_separador_comando)
+
+    _comando_symbol = _comando.to_sym
+
     puts "chamando processar_mensagem usuario=#{usuario}, mensagem=#{mensagem}"
 
     @usuarios << usuario unless @usuarios.index usuario
 
     #informar nome
-    if mensagem.index 'INFORMAR_NOME|'
+    if _comando_symbol == :INFORMAR_NOME
 
       _nome = mensagem.split('|')[1]
       puts "nome=#{_nome}"
@@ -315,13 +398,12 @@ class GameManager
       enviar_mensagem(usuario, 'INFORMAR_NOME_NOVAMENTE|') unless usuario.nome
 
       #listar usuarios
-    elsif mensagem.index 'LU|'
+    elsif _comando_symbol == :LU
 
       enviar_mensagem(usuario, "usuarios|#{@usuarios.to_s}")
 
       #convidar alguem
-    elsif mensagem.index 'INVITE|'
-
+    elsif _comando_symbol == :INVITE
       _str_convidado = (mensagem.split('|')[1]).strip
       #usa como chave p/ buscar o usuário o socket.to_s
       _convidado = @usuarios.find { |u| u.to_s == _str_convidado }
@@ -334,15 +416,15 @@ class GameManager
         enviar_mensagem(usuario, "INVITED_CANCELED|USUARIO_INVALIDO")
       end
 
-    elsif mensagem.index 'INVITED_DENNIED|'
+    elsif _comando_symbol == :INVITED_DENNIED
       _str_convite_negado = mensagem.split('|')[1].strip
       _convite = @convites.find { |conv| conv.to_s == _str_convite_negado }
       if (_convite)
         _usuario_que_convidou = _convite.usuario_que_convidou
-        enviar_mensagem(_usuario_que_convidou, "INVITED_DENNIED|#{_convite}")
+        enviar_mensagem(_usuario_que_convidou, "INVITED_DENNIED#{chars_separador_comando}#{_convite}")
       end #igonorar caso o convite nem exista no servidor
 
-    elsif mensagem.index 'INVITED_ACCEPT|'
+    elsif _comando_symbol == :INVITED_ACCEPT
       _str_convite_aceito = mensagem.split('|')[1].strip
       _convite = @convites.find { |conv| conv.to_s == _str_convite_aceito }
       if (_convite)
@@ -350,19 +432,26 @@ class GameManager
         _usuario_convidado = _convite.usuario_convidado
         _canal = Canal.new [_usuario_que_convidou, _usuario_convidado]
         @canais << _canal
-        enviar_mensagem(_usuario_que_convidou, "INVITED_ACCEPT|#{_canal}")
-        enviar_mensagem(_usuario_convidado, "INVITED_ACCEPT|#{_canal}")
+        enviar_mensagem(_usuario_que_convidou, "INVITED_ACCEPT#{@chars_separador_comando}#{_canal}")
+        enviar_mensagem(_usuario_convidado, "INVITED_ACCEPT#{@chars_separador_comando}#{_canal}")
         _convite.finalizacao = Time.now
         #por enquanto estou removendo o convite
         @convites.delete(_convite)
 
       end
+
+    elsif _comando_symbol == :PLAY
+      #obter o canal do parametro ou do servidor
+      #obter a posicao
+
     else
+
       puts "mensagem #{mensagem} não reconhecida...."
 
-
     end
+
   end
+
 
 
   def enviar_mensagem usuario, mensagem
@@ -410,6 +499,15 @@ class GameManager
   end
 
 
+  def jogar usuario, parametros
+    _str_canal = parametros.split(    )
+
+    _canal = @canais.find do |canal|
+      canal == parametros
+    end
+  end
+
+
 end
 
 
@@ -418,7 +516,7 @@ class TurnGameServer
   attr_reader :game_manager
 
   def initialize *args
-    @game_manager = GameManager.new
+    @game_manager = GameManager.new '|', ','
 
     @usuarios = []
     #@canais = []
