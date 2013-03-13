@@ -531,7 +531,7 @@ class TurnGameServer
       begin
         # @executando = true
         puts 'Iniciando servidor...'
-        dts = TCPServer.new('localhost', porta)
+        dts = TCPServer.new('0.0.0.0', porta)
         loop do
           Thread.new(dts.accept) do |s|
             _u = nil
