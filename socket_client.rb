@@ -36,7 +36,8 @@ class String
   end
 end
 
-s = TCPSocket.open 'localhost', 2000
+#s = TCPSocket.open 'localhost', 2000
+s = TCPSocket.open '192.34.57.47', 2000
 
 timeval = [5, 0].pack("l_2")
 s.setsockopt Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, timeval
