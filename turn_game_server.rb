@@ -2,39 +2,7 @@
 
 require 'socket'
 
-#Bombando string
-class String
-  def trim!(chars)
-    rtrim!(chars)
-    ltrim!(chars)
-  end
 
-  def rtrim!(chars)
-    gsub!(/(#{trim_prepare(chars)})+$/, '')
-  end
-
-  def ltrim!(chars)
-    gsub!(/^(#{trim_prepare(chars)})+/, '')
-  end
-
-  def trim(chars)
-    dup.rtrim(chars).ltrim(chars)
-  end
-
-  def rtrim(chars)
-    dup.rtrim!(chars)
-  end
-
-  def ltrim(chars)
-    dup.ltrim!(chars)
-  end
-
-  private
-  def trim_prepare(chars)
-    chars = chars.split("").collect { |char| Regexp.escape(char) }
-    chars.join('|')
-  end
-end
 
 =begin
 	Especificação de protocolo
@@ -205,7 +173,7 @@ end
 
 class Usuario < ObjetoBase
 
-  attr_accessor :ip, :pid, :nome, :socket, :time_without_connection, :partida
+  attr_accessor :ip, :pid, :nome, :socket, :ultima_conexao, :partida
 
 
   #será assumido como chave do usuario o @socket.to_s
@@ -603,7 +571,9 @@ class TurnGameServer
     Thread.start do
       while true do
         _usuarios_problema = @usuarios
-        .find_all { |u| Time.now - u.time_without_connection > 30 } #segundos
+        .find_all { |u|
+          Time.now - u.ultima_conexao > 30
+        } #segundos
         puts "Usuarios #{_usuarios_problema} estao com problema testando...."
         _usuarios_problema.each do |u|
           puts "checando usuario #{u}"
@@ -615,9 +585,9 @@ class TurnGameServer
               Timeout
               .timeout { _retorno = _sockect.received(4) }
 
-              # unless _retorno
-              fechar_conexao u
-                # end
+              unless _retorno
+                fechar_conexao u
+              end
 
 
             rescue Exception => e
@@ -637,23 +607,33 @@ class TurnGameServer
     @usuarios.delete(usuario)
     puts "fechada a conexao do usuario #{usuario}"
     @game_manager.remover_usuario usuario
+    usuario.socket.close unless usuario.socket.closed?
   end
 
 
 end
 
 
-porta = 0
-while porta < 1024 do
+ begin
+   _porta = ARGV[0].to_i
+ rescue
+     puts "Parametro inválida...."
+ensure
+
+
+ end
+
+while _porta < 1024 do
   print 'Entre com a porta do servidor: '
-  porta = gets.chomp.to_i
+  _porta = gets.chomp.to_i
 end
 
 server = TurnGameServer.new
 
-server.iniciar porta
+server.iniciar _porta
 
 sleep 2
+
 
 comando = ''
 while true do
