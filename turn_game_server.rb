@@ -71,53 +71,6 @@ class UsuarioEvent
 end
 
 
-class UsuarioEventsListener < ObjetoBase
-  #@@EVENTOS = [:CONNECTED, :DISCONNECTED, :INVITED, :INVITED_ACCEPT, :INVITED_DENIED]
-
-  #  Talvez seja melhor implementar um has_user p/ quem herdar implementar e saber se o mesmo esta interessado em eventos
-  # daquele usuario
-
-  def call_event usuario_event
-    begin
-
-      self.send(usuario_event[:type_event].to_s.downcase, usuario_event[:usuario], usuario_event[:more_params])
-
-    rescue NoMethodError => no_meth_exp
-      puts "Sem metodo p/ o evento em questão."
-
-    rescue ArgumentError => arg_error
-      puts "Metodo com número de argumentos errados ou mal implementado."
-    ensure
-      puts "Termino de call_event."
-    end
-  end
-
-
-  def connected usuario, parametros
-    puts "usuario #{usuario} conectado c/ parametros #{parametros}"
-  end
-
-
-  def disconnected usuario, parametros
-    puts "usuario #{usuario} disconectado c/ parametros #{parametros}"
-  end
-
-  def invited usuario, parametros
-    puts "usuario #{usuario} convidado c/ parametros #{parametros}"
-  end
-
-
-  def invited_accept usuario, parametros
-    puts "usuario #{usuario} conectado c/ parametros #{parametros}"
-  end
-
-
-  def invited_denied usuario, parametros
-    puts "usuario #{usuario} conectado c/ parametros #{parametros}"
-  end
-
-
-end
 
 
 class Convite < ObjetoBase
@@ -525,6 +478,8 @@ class TurnGameServer
               # Thread.start(daemon: true) {
               while _line = s.gets # Read lines from socket
                 puts "recebendo de #{s}: #{_line} \n" # and print them
+                #reseta a hora da ultima conexao
+                _u.ultima_conexao = Time.now
                 @game_manager.processar_mensagem(_u, _line)
               end
                 # }
