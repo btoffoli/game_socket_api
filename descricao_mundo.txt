@@ -1,0 +1,37 @@
+O jogo de turno é composto por n jogadores (a primeira versão estará especificada p/ 2 jogadores apenas)
+um jogador ao conectar recebe a confirmação de conectado
+
+
+
+
+
+
+o servidor também será capaz de responder ao seguintes comandos após o client esta conectado ao servidor:
+    \CONNECTED - RESPOSTA QUE O CLIENTE RECEBE DO SERVIDOR
+		APÓS ESTABELECER UMA CONEXÃO C\ SUCESSO
+
+	\LU - REQUISICAO QUE O CLIENTE FAZ P\ RECEBER A LISTA DE CLIENTES NAO OCUPADOS
+
+	\LUA - REQUISICAO QUE O CLIENTE FAZ P\ RECEBER A LISTA TODOS OS CLIENTES E SEUS STATUS
+
+	\SET_USER_INFO - <***PARAMETROS - Informações sobre o usuário***>, após toda conexão/reconexão, no caso de reconexão enviar ultimo id
+
+	\PLAY <***PARAMETROS***> - REQUISICAO Q O CLIENTE FAZ P/ EXECUTAR UMA JOGADA
+
+
+	\PING - REQUISICAO TANTO SERVIDOR OU CLIENTE P/ SERVIR DE ACK E TESTAR A CONEXAO
+
+	\PONG - RESPOSTA DA REQUISICAO PING P/ TESTE DE CONEXAO
+
+	\INVITE <***USUARIO(S)***> - CLIENTE FAZ REQUISICAO AO SERVIDOR P/ INFORMAR CONVITE A
+		OUTRO(S) USUARIO(S)
+
+	\CONNECTED CANAL - RESPOSTA DO SERVIDOR AO CLIENTE
+		EM CASO DE SUCESSO NA REQUISICAO DE CONVITE, INFORMAR CANAL C/ USUARIOS
+		QUE ACEITARÃO O CONVITE
+
+	\NOT_CONNECTED CANAL - RESPOSTA DO SERVIDOR AO CLIENTE INFORMANDO O NAO SUCESSO NA
+		ABERTURA DO CANAL
+
+
+OBS: O formato da mensagem será COMANDO|parametro1=x1,parametro2=x2...
