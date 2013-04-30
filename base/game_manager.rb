@@ -35,13 +35,16 @@ class GameManager
     if _comando_symbol == :SET_USER_INFO
 
       _nick = _parametros[:nick]
-      _last_id = _parametros[:_last_id]
+      _last_id = _parametros[:last_id]
 
-      enviar_mensagem(usuario, 'SET_USER_INFO|{STATUS:"ERROR"}') unless _nick
+      if _nick
+        enviar_mensagem(usuario, 'SET_USER_INFO|{STATUS: "OK"}')
+      elsif
+        enviar_mensagem(usuario, 'SET_USER_INFO|{STATUS:"ERROR"}')
+      end
 
       usuario.nick = _nick
       usuario.last_id = _last_id
-      enviar_mensagem(usuario, 'SET_USER_INFO|{STATUS: "OK"}') unless usuario.nick
 
       #listar usuarios
     elsif _comando_symbol == :LU

@@ -80,7 +80,7 @@ class TurnGameServer
 
               puts "@usuarios = #{@usuarios}"
 
-              s.puts "@usuarios = #{@usuarios}"
+              s.puts "CONECTED|{id: \"#{_u.id}\"}"
 
               # Cuida do recebimento de mensagens
               # Thread.start(daemon: true) {
@@ -93,7 +93,7 @@ class TurnGameServer
                 # }
 
             rescue Exception => e
-              puts "#{e}"
+              puts "#{e}\n"
               puts "Ocorreu um erro com o cliente"
             ensure
               puts 'Fechando conexao'
@@ -135,7 +135,7 @@ class TurnGameServer
       while true do
         _usuarios_problema = @usuarios
         .find_all { |u|
-          Time.now - u.ultima_conexao > 30
+          Time.now - u.ultima_conexao > 300
         } #segundos
         puts "Usuarios #{_usuarios_problema} estao com problema testando...."
         _usuarios_problema.each do |u|
